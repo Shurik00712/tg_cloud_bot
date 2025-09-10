@@ -82,6 +82,23 @@ async def handle_video(update, context):
     await update.message.reply_text("Видео получено!")
     
     #async def handle_file()
+async def handle_file_name(update, context):
+    context.user_data["action_file"] = ""
+    keyboard = ["добавить имя файла", "отменить загрузку", "продолжить"]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        'Выберите действие:',
+        reply_markup=reply_markup
+    )
+    text = update.message.text
+    if text == "добавить имя файла":
+        context.user_data["action_file"] = "add_name"
+    elif text == "отменить загрузку":
+        context.user_data["action_file"] = "deny_download"
+    elif text == "продолжить":
+        context.user_data["action_file"] = "add_id_name"
+
+
 async def handle_file(update, context):
     file_info = None
     file_obj = None
@@ -90,7 +107,7 @@ async def handle_file(update, context):
 
 
     user = update.effective_user
-
+    handle_file_name(update, context)
     os.makedirs(f"users/{user.id}/audio", exist_ok=True)
     os.makedirs(f"users/{user.id}/documents", exist_ok=True)
     os.makedirs(f"users/{user.id}/other", exist_ok=True)
@@ -103,7 +120,7 @@ async def handle_file(update, context):
     #     print("Грузи")
     #     context.user_data['can_upload'] = True
     #     return
-    
+
     if update.message.document:
         file_info = update.message.document
         file_obj = await file_info.get_file()
