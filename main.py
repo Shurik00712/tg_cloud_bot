@@ -15,6 +15,7 @@ async def start(update, context):
     context.user_data["can_upload"] = False
     text = f"""Привет, {user.first_name}!
     Я бот CLOUDATA!
+    создатель SANYOK
     Мои команды:
     /start - начать
     /help - помощь
@@ -38,7 +39,7 @@ async def menu_command(update, context):
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
-        '🎛️ Выберите действие:',
+        'Выберите действие:',
         reply_markup=reply_markup
     )
 async def handle_voice(update, context):
@@ -86,6 +87,16 @@ async def handle_file(update, context):
     file_obj = None
     filename = ""
     file_size = 0
+
+
+    user = update.effective_user
+
+    os.makedirs(f"users/{user.id}/audio", exist_ok=True)
+    os.makedirs(f"users/{user.id}/documents", exist_ok=True)
+    os.makedirs(f"users/{user.id}/other", exist_ok=True)
+    os.makedirs(f"users/{user.id}/photos", exist_ok=True)
+    os.makedirs(f"users/{user.id}/videos", exist_ok=True)
+    os.makedirs(f"users/{user.id}/voice", exist_ok=True)
     
     # Определяем тип файла и получаем объект
     # if update.message.text=='Загрузить данные':
@@ -100,7 +111,7 @@ async def handle_file(update, context):
         file_size = file_info.file_size
         
     elif update.message.photo:
-        file_info = update.message.photo[-1]  # Берем самое качественное фото
+        file_info = update.message.photo[-1]
         file_obj = await file_info.get_file()
         filename = f"photo_{file_info.file_id}.jpg"
         file_size = file_info.file_size
@@ -164,7 +175,7 @@ async def handle_file(update, context):
         
         # Полный путь для сохранения
     print("ok")
-    save_path = f"data/{folder}/{filename}"
+    save_path = f"users/{user.id}/{folder}/{filename}"
         
         # Скачиваем файл
     try:
