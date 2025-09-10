@@ -15,7 +15,7 @@ async def start(update, context):
     context.user_data["can_upload"] = False
     text = f"""Привет, {user.first_name}!
     Я бот CLOUDATA!
-    создатель SANYOK
+    создатель SANYOK007
     Мои команды:
     /start - начать
     /help - помощь
