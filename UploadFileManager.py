@@ -40,22 +40,22 @@ class UploadFileManager:
         return ConversationHandler.END
     
     async def handle_file_data(self, update, context):
-        # Ваша существующая реализация handle_file_data
         user = update.effective_user
         file_obj = None
         
         file_handlers = {
-            'document': (update.message.document, '.docx'),
-            'photo': (update.message.photo[-1], '.jpg'),
-            'video': (update.message.video, '.mp4'),
-            'audio': (update.message.audio, '.mp3'),
-            'voice': (update.message.voice, '.ogg'),
-            'video_note': (update.message.video_note, '.mp4'),
-            'sticker': (update.message.sticker, None),
-            'animation': (update.message.animation, '.gif')
+            'document': (lambda: update.message.document, '.docx'),
+            'photo': (lambda: update.message.photo[-1], '.jpg'),
+            'video': (lambda: update.message.video, '.mp4'),
+            'audio': (lambda: update.message.audio, '.mp3'),
+            'voice': (lambda: update.message.voice, '.ogg'),
+            'video_note': (lambda: update.message.video_note, '.mp4'),
+            'sticker': (lambda: update.message.sticker, None),
+            'animation': (lambda: update.message.animation, '.gif')
         }
         
         for file_type, (file_data, default_ext) in file_handlers.items():
+            file_data = file_data()
             if file_data:
                 file_obj = await file_data.get_file()
                 
