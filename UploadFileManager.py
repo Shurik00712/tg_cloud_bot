@@ -38,10 +38,9 @@ class UploadFileManager:
             await update.message.reply_text(f"Грузи, {user.first_name}", reply_markup=ReplyKeyboardRemove())
             return self.UPLOAD_FILE
         return ConversationHandler.END
-    
-    async def handle_file_data(self, update, context):
-        user = update.effective_user
+    async def get_file_data_type(self, update, context):
         file_obj = None
+        file_data = None
         
         file_handlers = {
             'document': (lambda: update.message.document, '.docx'),
@@ -71,7 +70,11 @@ class UploadFileManager:
                     context.user_data["file_ext"] = original_ext if original_ext else default_ext
                 
                 break
+        return (file_data, file_obj)
         
+    async def handle_file_data(self, update, context):
+        user = update.effective_user
+        file_data, file_obj = await self.get_file_data_type(update, context)
         if not file_data and update.message.text != 'Загрузить данные':
             await update.message.reply_text("Нужно отправить файл, а не текст", reply_markup=ReplyKeyboardRemove())
             return self.UPLOAD_FILE
@@ -114,7 +117,7 @@ class UploadFileManager:
         
         text = update.message.text
         if text == "добавить имя файла":
-            await update.message.reply_text("Введите имя:")
+            await update.message.reply_text("Введите имя:", reply_markup=ReplyKeyboardRemove())
             context.user_data["action_file"] = "waiting_for_filename"
             return self.CONFIRM
         elif text == "отменить загрузку":
@@ -146,20 +149,31 @@ class UploadFileManager:
                 await context.user_data['file_file'].download_to_drive(
                     f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
                 )
+                context.user_data["last_save"] = f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
                 await update.message.reply_text("Файл успешно сохранен", reply_markup=ReplyKeyboardRemove())
             except Exception as e:
                 logger.error(f"Ошибка при сохранении файла: {e}")
                 await update.message.reply_text("Не получилось сохранить файл", reply_markup=ReplyKeyboardRemove())
-        
+        last_save = context.user_data.get("last_save")
         context.user_data.clear()
+        if last_save is not None:
+            context.user_data["last_save"] = last_save
         return ConversationHandler.END
     
     async def cancel(self, update, context):
         if "file_file" not in context.user_data:
             text = """
             Вы ещё не начали загрузку файла"""
+            if "last_save" in context.user_data:
+                os.remove(context.user_data["last_save"])
+                context.user_data.clear()
+                text = """
+                Предыдущий файл удален"""
             await update.message.reply_text(text)
         else:
             await update.message.reply_text("Загрузка файла отменена", reply_markup=ReplyKeyboardRemove())
+            last_save = context.user_data.get("last_save")
             context.user_data.clear()
+            if last_save is not None:
+                context.user_data["last_save"] = last_save
         return ConversationHandler.END
