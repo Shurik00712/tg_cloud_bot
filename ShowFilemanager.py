@@ -1,5 +1,6 @@
 import os
 import logging
+from cryptographer import decrypt_file_rust_style
 from telegram.ext import ConversationHandler, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 logging.basicConfig(
@@ -67,6 +68,7 @@ class ShowFileManager:
             await query.message.reply_text("Файлы не найдены")
             await self.show_cat(update.callback_query.message, context)
         for file in files:
+            file = file.rsplit(".encrypted", 1)[0]
             keyboard.append([InlineKeyboardButton(file, callback_data=file)])
         keyboard.append([InlineKeyboardButton("К категориям", callback_data='back_to_cat')])
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -91,6 +93,7 @@ class ShowFileManager:
             await message.reply_text("Не получилось отправить файл")
             return ConversationHandler.END
     async def send_file(self, context, query, filename, cat):
+        decrypt_file_rust_style(context.user_data["path_to_show"]+"/"+filename+".encrypted", context.user_data["path_to_show"]+"/"+filename, 100)
         with open(context.user_data["path_to_show"]+"/"+filename, 'rb') as file:
             if cat == 'photos':
                 await query.reply_photo(photo=file, caption=filename)

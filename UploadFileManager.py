@@ -2,6 +2,7 @@ import os
 import logging
 from telegram.ext import ConversationHandler, MessageHandler, filters, CommandHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+from cryptographer import encrypt_file_rust_style, decrypt_file_rust_style
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -166,10 +167,10 @@ class UploadFileManager:
             os.makedirs(f"users/{user.id}/voice", exist_ok=True)
             
             try:
-                await context.user_data['file_file'].download_to_drive(
-                    f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
-                )
-                context.user_data["last_save"] = f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
+                path = f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
+                await context.user_data['file_file'].download_to_drive(path)
+                encrypt_file_rust_style(path, path+".encrypted", 100)
+                context.user_data["last_save"] = path+".encrypted"
                 await update.message.reply_text("Файл успешно сохранен", reply_markup=ReplyKeyboardRemove())
             except Exception as e:
                 logger.error(f"Ошибка при сохранении файла: {e}")
