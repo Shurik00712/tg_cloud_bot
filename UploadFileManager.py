@@ -2,19 +2,22 @@ import os
 import logging
 from telegram.ext import ConversationHandler, MessageHandler, filters, CommandHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
 class UploadFileManager:
     def __init__(self):
         self.UPLOAD_FILE, self.DECISION, self.CONFIRM = range(3)
     
-    def get_conversation_handler(self):
+    def get_conversation_handler(self, cancel_func, menu_func):
         return ConversationHandler(
             entry_points=[
-                MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
+                MessageHandler(filters.Regex("^Загрузить данные$"), self.handle_message)
             ],
             states={
                 self.UPLOAD_FILE: [
@@ -28,19 +31,33 @@ class UploadFileManager:
                     MessageHandler(filters.TEXT & ~filters.COMMAND, self.confirm_file)
                 ],
             },
-            fallbacks=[CommandHandler("cancel", self.cancel)]
+            fallbacks=[
+                CommandHandler("cancel", cancel_func),
+                CommandHandler("menu", self.menu_wrapper(menu_func))
+            ]
         )
     
+    def menu_wrapper(self, menu_func):
+        async def wrapper(update, context):
+            context.user_data.clear()
+            await update.message.reply_text("Возврат в главное меню", reply_markup=ReplyKeyboardRemove())
+            
+            return await menu_func(update, context)
+        return wrapper
+    
     async def handle_message(self, update, context):
-        text = update.message.text
-        if text == 'Загрузить данные':
-            user = update.effective_user
-            await update.message.reply_text(f"Грузи, {user.first_name}", reply_markup=ReplyKeyboardRemove())
-            return self.UPLOAD_FILE
-        return ConversationHandler.END
+        user = update.effective_user
+        context.user_data.clear()
+        context.user_data["curr"] = "upload"
+        await update.message.reply_text(f"Грузи, {user.first_name}", reply_markup=ReplyKeyboardRemove())
+        return self.UPLOAD_FILE
+    
     async def get_file_data_type(self, update, context):
         file_obj = None
         file_data = None
+        
+        if update.message.text:
+            return (None, None)
         
         file_handlers = {
             'document': (lambda: update.message.document, '.docx'),
@@ -53,8 +70,8 @@ class UploadFileManager:
             'animation': (lambda: update.message.animation, '.gif')
         }
         
-        for file_type, (file_data, default_ext) in file_handlers.items():
-            file_data = file_data()
+        for file_type, (file_getter, default_ext) in file_handlers.items():
+            file_data = file_getter()
             if file_data:
                 file_obj = await file_data.get_file()
                 
@@ -70,14 +87,16 @@ class UploadFileManager:
                     context.user_data["file_ext"] = original_ext if original_ext else default_ext
                 
                 break
+        
         return (file_data, file_obj)
         
     async def handle_file_data(self, update, context):
         user = update.effective_user
         file_data, file_obj = await self.get_file_data_type(update, context)
+        
         if not file_data and update.message.text != 'Загрузить данные':
             await update.message.reply_text("Нужно отправить файл, а не текст", reply_markup=ReplyKeyboardRemove())
-            return self.UPLOAD_FILE
+            return ConversationHandler.END
         elif not file_data or not file_obj:
             await update.message.reply_text("❌ Не удалось обработать файл", reply_markup=ReplyKeyboardRemove())
             return ConversationHandler.END
@@ -99,8 +118,6 @@ class UploadFileManager:
         save_path = f"users/{user.id}/{folder}/"
         os.makedirs(save_path, exist_ok=True)
         
-        # if update.message.photo:
-        #     file_obj = file_obj[-1]
         context.user_data["file_file"] = file_obj
         context.user_data["file_path"] = save_path
         context.user_data["file_id"] = file_obj.file_id
@@ -125,6 +142,7 @@ class UploadFileManager:
         elif text == "продолжить":
             context.user_data["action_file"] = "use_id_or_name"
             return await self.confirm_file(update, context)
+        
         return self.DECISION
     
     async def confirm_file(self, update, context):
@@ -138,6 +156,8 @@ class UploadFileManager:
         
         if context.user_data["action_file"] != "deny_download":
             user = update.effective_user
+            
+            # Создаем необходимые директории
             os.makedirs(f"users/{user.id}/audio", exist_ok=True)
             os.makedirs(f"users/{user.id}/documents", exist_ok=True)
             os.makedirs(f"users/{user.id}/other", exist_ok=True)
@@ -154,26 +174,15 @@ class UploadFileManager:
             except Exception as e:
                 logger.error(f"Ошибка при сохранении файла: {e}")
                 await update.message.reply_text("Не получилось сохранить файл", reply_markup=ReplyKeyboardRemove())
+        
         last_save = context.user_data.get("last_save")
         context.user_data.clear()
         if last_save is not None:
             context.user_data["last_save"] = last_save
+        
         return ConversationHandler.END
     
     async def cancel(self, update, context):
-        if "file_file" not in context.user_data:
-            text = """
-            Вы ещё не начали загрузку файла"""
-            if "last_save" in context.user_data:
-                os.remove(context.user_data["last_save"])
-                context.user_data.clear()
-                text = """
-                Предыдущий файл удален"""
-            await update.message.reply_text(text)
-        else:
-            await update.message.reply_text("Загрузка файла отменена", reply_markup=ReplyKeyboardRemove())
-            last_save = context.user_data.get("last_save")
-            context.user_data.clear()
-            if last_save is not None:
-                context.user_data["last_save"] = last_save
+        context.user_data.clear()
+        await update.message.reply_text("Загрузка отменена", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
