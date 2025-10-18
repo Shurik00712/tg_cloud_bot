@@ -1,5 +1,6 @@
 import os
 import logging
+import datetime
 from telegram.ext import ConversationHandler, MessageHandler, filters, CommandHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
 from cryptographer import encrypt_file_rust_style, decrypt_file_rust_style
@@ -151,7 +152,7 @@ class UploadFileManager:
         if context.user_data["action_file"] == "waiting_for_filename":
             filename = update.message.text
         elif context.user_data["action_file"] == "use_id_or_name":
-            filename = context.user_data["file_name"] or context.user_data["file_id"]
+            filename = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         else:
             return ConversationHandler.END
         
@@ -168,8 +169,11 @@ class UploadFileManager:
             
             try:
                 path = f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
+                print(path)
                 await context.user_data['file_file'].download_to_drive(path)
-                encrypt_file_rust_style(path, path+".encrypted", 100)
+                print(path)
+                print(type(user.id))
+                encrypt_file_rust_style(path, path+".encrypted", user.id)
                 context.user_data["last_save"] = path+".encrypted"
                 await update.message.reply_text("Файл успешно сохранен", reply_markup=ReplyKeyboardRemove())
             except Exception as e:

@@ -2,13 +2,20 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import PBKDF2
 import os
+import hashlib
 
 def encrypt_file_rust_style(input_file, output_file, password):
     """
     Современное шифрование в стиле Rust-библиотек
     """
+    
     # Генерируем соль (как в Rust криптобиблиотеках)
     salt = get_random_bytes(16)
+    
+    # Хешируем длинный пароль до разумного размера для PBKDF2
+    password = bytes(str(password).encode())
+    # Хешируем длинный пароль до разумного размера для PBKDF2
+    password = hashlib.sha512(password).digest()
     
     # Создаем ключ с помощью PBKDF2 (аналог Rust's argon2)
     key = PBKDF2(password, salt, 32, count=1000000)
@@ -43,7 +50,10 @@ def decrypt_file_rust_style(input_file, output_file, password):
         iv = f.read(16)
         tag = f.read(16)
         ciphertext = f.read()
-    
+    password = bytes(str(password).encode())
+    # Хешируем длинный пароль до разумного размера для PBKDF2
+    password = hashlib.sha512(password).digest()
+
     key = PBKDF2(password, salt, 32, count=1000000)
     cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
     
