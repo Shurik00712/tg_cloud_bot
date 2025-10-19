@@ -21,7 +21,6 @@ async def start(update, context):
     context.user_data["can_upload"] = False
     text = f"""Привет, {user.first_name}!
 Я бот CLOUDATA!
-создатель SANYOK
 Мои команды:
 /start - начать
 /help - помощь
@@ -40,7 +39,7 @@ async def help_command(update, context):
     return ConversationHandler.END
 
 async def about_command(update, context):
-    text = "Этот бот может сохранить твои данные в облаке"
+    text = "Этот бот может сохранить твои данные в облаке. Максимальный размер файла: 50 МБ"
     await update.message.reply_text(text)
     return ConversationHandler.END
 
@@ -48,51 +47,47 @@ async def menu_command(update, context):
     context.user_data.clear()
     
     keyboard = [
-        ['Загрузить данные', 'Просмотреть файлы']
+        ['📤 Загрузить',
+        '📂 Просмотреть', 
+        '🚪 Выйти из режима']
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
         'Выберите действие:',
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
     )
     return ConversationHandler.END
 
 async def cancel_command(update, context):
-    if "curr" in context.user_data:
-        if context.user_data["curr"] == "upload":
-            if "file_file" not in context.user_data:
-                text = "Вы ещё не начали загрузку файла"
-                if "last_save" in context.user_data:
-                    try:
-                        os.remove(context.user_data["last_save"])
-                        text = "Предыдущий файл удален"
-                    except Exception as e:
-                        logger.error(f"Ошибка при удалении файла: {e}")
-                await update.message.reply_text(text)
-            else:
-                await update.message.reply_text("Загрузка файла отменена", reply_markup=ReplyKeyboardRemove())
+    current_mode = context.user_data.get("curr")
+    print(current_mode)
+    
+    mode_messages = {
+        "upload": "загрузки файла",
+        "show": "просмотра файлов",
+        # добавьте другие режимы по мере необходимости
+    }
+    
+    if current_mode in mode_messages:
+        message = f"Вы вышли из режима {mode_messages[current_mode]}"
+        context.user_data.clear()
             
-            last_save = context.user_data.get("last_save")
-            context.user_data.clear()
-            if last_save is not None:
-                context.user_data["last_save"] = last_save
-                
-        elif context.user_data["curr"] == "show":
-            await update.message.reply_text("Просмотр файлов отменен", reply_markup=ReplyKeyboardRemove())
-            context.user_data.clear()
+        await update.message.reply_text(message, reply_markup=ReplyKeyboardRemove())
+        
     else:
-        await update.message.reply_text("Нет активных операций для отмены")
+        await update.message.reply_text("Нет активных операций для отмены", reply_markup=ReplyKeyboardRemove())
+        context.user_data.clear()
     
     return ConversationHandler.END
 
 async def handle_text_message(update, context):
     text = update.message.text
-    if text == 'Загрузить данные':
-        # Это будет перехвачено ConversationHandler UploadFileManager
+    if text == '📤 Загрузить':
         return
-    elif text == 'Просмотреть файлы':
-        # Это будет перехвачено ConversationHandler ShowFileManager
+    elif text == '📂 Просмотреть':
         return
+    elif text == '🚪 Выйти из режима':
+        await cancel_command(update, context)
     else:
         await update.message.reply_text("Используйте команды из меню или /menu")
 
@@ -119,7 +114,6 @@ def setup_bot(token):
 
 def main():
     application = setup_bot(BOT_TOKEN)
-    print("Бот стартует...")
     application.run_polling()
 
 if __name__ == "__main__":

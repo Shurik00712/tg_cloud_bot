@@ -3,7 +3,7 @@ import logging
 import datetime
 from telegram.ext import ConversationHandler, MessageHandler, filters, CommandHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
-from cryptographer import encrypt_file_rust_style, decrypt_file_rust_style
+from cryptographer import encrypt_file
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -19,7 +19,7 @@ class UploadFileManager:
     def get_conversation_handler(self, cancel_func, menu_func):
         return ConversationHandler(
             entry_points=[
-                MessageHandler(filters.Regex("^Загрузить данные$"), self.handle_message)
+                MessageHandler(filters.Regex("^📤 Загрузить$"), self.handle_message)
             ],
             states={
                 self.UPLOAD_FILE: [
@@ -48,10 +48,9 @@ class UploadFileManager:
         return wrapper
     
     async def handle_message(self, update, context):
-        user = update.effective_user
         context.user_data.clear()
         context.user_data["curr"] = "upload"
-        await update.message.reply_text(f"Грузи, {user.first_name}", reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(f"Загрузите файл", reply_markup=ReplyKeyboardRemove())
         return self.UPLOAD_FILE
     
     async def get_file_data_type(self, update, context):
@@ -96,11 +95,11 @@ class UploadFileManager:
         user = update.effective_user
         file_data, file_obj = await self.get_file_data_type(update, context)
         
-        if not file_data and update.message.text != 'Загрузить данные':
+        if not file_data and update.message.text != 'Загрузить файл':
             await update.message.reply_text("Нужно отправить файл, а не текст", reply_markup=ReplyKeyboardRemove())
             return ConversationHandler.END
         elif not file_data or not file_obj:
-            await update.message.reply_text("❌ Не удалось обработать файл", reply_markup=ReplyKeyboardRemove())
+            await update.message.reply_text("Не удалось обработать файл", reply_markup=ReplyKeyboardRemove())
             return ConversationHandler.END
         
         file_ext = context.user_data["file_ext"]
@@ -173,21 +172,12 @@ class UploadFileManager:
                 await context.user_data['file_file'].download_to_drive(path)
                 print(path)
                 print(type(user.id))
-                encrypt_file_rust_style(path, path+".encrypted", user.id)
-                context.user_data["last_save"] = path+".encrypted"
+                encrypt_file(path, path+".encrypted", user.id)
                 await update.message.reply_text("Файл успешно сохранен", reply_markup=ReplyKeyboardRemove())
             except Exception as e:
                 logger.error(f"Ошибка при сохранении файла: {e}")
                 await update.message.reply_text("Не получилось сохранить файл", reply_markup=ReplyKeyboardRemove())
         
-        last_save = context.user_data.get("last_save")
         context.user_data.clear()
-        if last_save is not None:
-            context.user_data["last_save"] = last_save
         
-        return ConversationHandler.END
-    
-    async def cancel(self, update, context):
-        context.user_data.clear()
-        await update.message.reply_text("Загрузка отменена", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END

@@ -1,6 +1,6 @@
 import os
 import logging
-from cryptographer import decrypt_file_rust_style
+from cryptographer import decrypt_file
 from telegram.ext import ConversationHandler, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -17,7 +17,7 @@ class ShowFileManager:
     def get_conversation_handler(self, cancel_func):
         return ConversationHandler(
             entry_points=[
-                MessageHandler(filters.Regex("^Просмотреть файлы$"), self.start_show)
+                MessageHandler(filters.Regex("^📂 Просмотреть$"), self.start_show)
             ],
             states={
                 self.CHOOSE_CAT: [
@@ -34,8 +34,8 @@ class ShowFileManager:
         )
     
     async def start_show(self, update, context):
-        context.user_data["curr"] = "show"
         context.user_data.clear()
+        context.user_data["curr"] = "show"
         await self.show_cat(update.message, context)
         return self.CHOOSE_CAT
     
@@ -62,7 +62,6 @@ class ShowFileManager:
         await query.message.delete()
         context.user_data["cat"] = query.data
         
-        # Проверяем есть ли файлы в категории
         user = update.effective_user
         cat = context.user_data["cat"]
         try:
@@ -73,12 +72,10 @@ class ShowFileManager:
             return ConversationHandler.END
         
         if not files:
-            # Если файлов нет, сразу показываем категории снова
             await query.message.reply_text("В этой категории нет файлов")
             await self.show_cat(query.message, context)
             return self.CHOOSE_CAT
         
-        # Если файлы есть, показываем их
         await self.show_files_list(query.message, files)
         return self.CHOOSE
     
@@ -124,7 +121,7 @@ class ShowFileManager:
         full_path = context.user_data["full_path"]
         encrypted_path = full_path + ".encrypted"
         
-        decrypt_file_rust_style(encrypted_path, full_path, update.effective_user.id)
+        decrypt_file(encrypted_path, full_path, update.effective_user.id)
         
         with open(full_path, 'rb') as file:
             if cat == 'photos':
