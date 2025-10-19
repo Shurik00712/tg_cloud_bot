@@ -13,10 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class UploadFileManager:
-    def __init__(self):
+    def __init__(self, cancel_func, menu_func):
         self.UPLOAD_FILE, self.DECISION, self.CONFIRM = range(3)
+        self.cancel = cancel_func
+        self.menu_func = menu_func
     
-    def get_conversation_handler(self, cancel_func, menu_func):
+    def get_conversation_handler(self):
         return ConversationHandler(
             entry_points=[
                 MessageHandler(filters.Regex("^📤 Загрузить$"), self.handle_message)
@@ -34,21 +36,27 @@ class UploadFileManager:
                 ],
             },
             fallbacks=[
-                CommandHandler("cancel", cancel_func),
-                CommandHandler("menu", self.menu_wrapper(menu_func))
+                CommandHandler("cancel", self.cancel),
+                CommandHandler("menu", self.menu_wrapper(self.menu_func))
             ]
         )
     
     def menu_wrapper(self, menu_func):
         async def wrapper(update, context):
+            saved_code = context.user_data.get("access_code")
             context.user_data.clear()
+            if saved_code:
+                context.user_data["access_code"] = saved_code
             await update.message.reply_text("Возврат в главное меню", reply_markup=ReplyKeyboardRemove())
             
             return await menu_func(update, context)
         return wrapper
     
     async def handle_message(self, update, context):
+        saved_code = context.user_data.get("access_code")
         context.user_data.clear()
+        if saved_code:
+            context.user_data["access_code"] = saved_code
         context.user_data["curr"] = "upload"
         await update.message.reply_text(f"Загрузите файл", reply_markup=ReplyKeyboardRemove())
         return self.UPLOAD_FILE
@@ -92,13 +100,19 @@ class UploadFileManager:
         return (file_data, file_obj)
         
     async def handle_file_data(self, update, context):
+        if not context.user_data.get("curr"):
+            return ConversationHandler.END
         user = update.effective_user
         file_data, file_obj = await self.get_file_data_type(update, context)
         
-        if not file_data and update.message.text != 'Загрузить файл':
+        if not file_data and update.message.text == '📤 Загрузить':
+            await update.message.reply_text("Загрузка уже начата", reply_markup=ReplyKeyboardRemove())
+            return self.UPLOAD_FILE
+        elif not file_data and update.message.text != '📤 Загрузить':
             await update.message.reply_text("Нужно отправить файл, а не текст", reply_markup=ReplyKeyboardRemove())
             return ConversationHandler.END
-        elif not file_data or not file_obj:
+        
+        if not file_data or not file_obj:
             await update.message.reply_text("Не удалось обработать файл", reply_markup=ReplyKeyboardRemove())
             return ConversationHandler.END
         
@@ -158,7 +172,6 @@ class UploadFileManager:
         if context.user_data["action_file"] != "deny_download":
             user = update.effective_user
             
-            # Создаем необходимые директории
             os.makedirs(f"users/{user.id}/audio", exist_ok=True)
             os.makedirs(f"users/{user.id}/documents", exist_ok=True)
             os.makedirs(f"users/{user.id}/other", exist_ok=True)
@@ -168,16 +181,16 @@ class UploadFileManager:
             
             try:
                 path = f"{context.user_data['file_path']}{filename}{context.user_data['file_ext']}"
-                print(path)
                 await context.user_data['file_file'].download_to_drive(path)
-                print(path)
-                print(type(user.id))
-                encrypt_file(path, path+".encrypted", user.id)
+                encrypt_file(path, path+".encrypted", context.user_data["access_code"])
                 await update.message.reply_text("Файл успешно сохранен", reply_markup=ReplyKeyboardRemove())
             except Exception as e:
                 logger.error(f"Ошибка при сохранении файла: {e}")
                 await update.message.reply_text("Не получилось сохранить файл", reply_markup=ReplyKeyboardRemove())
         
+        saved_code = context.user_data.get("access_code")
         context.user_data.clear()
+        if saved_code:
+            context.user_data["access_code"] = saved_code
         
         return ConversationHandler.END

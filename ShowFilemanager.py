@@ -11,10 +11,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ShowFileManager:
-    def __init__(self):
+    def __init__(self, cancel_func):
         self.CHOOSE_CAT, self.CHOOSE, self.ACTION, self.RENAME, self.CONFIRM = range(3, 8)
+        self.cancel = cancel_func
     
-    def get_conversation_handler(self, cancel_func):
+    def get_conversation_handler(self):
         return ConversationHandler(
             entry_points=[
                 MessageHandler(filters.Regex("^📂 Просмотреть$"), self.start_show)
@@ -30,11 +31,13 @@ class ShowFileManager:
                 self.RENAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.rename)],
                 self.CONFIRM: [CallbackQueryHandler(self.confirm)]
             },
-            fallbacks=[CommandHandler("cancel", cancel_func)]
+            fallbacks=[CommandHandler("cancel", self.cancel)]
         )
     
     async def start_show(self, update, context):
+        access_code = context.user_data.get("access_code")
         context.user_data.clear()
+        context.user_data["access_code"] = access_code
         context.user_data["curr"] = "show"
         await self.show_cat(update.message, context)
         return self.CHOOSE_CAT
@@ -121,7 +124,7 @@ class ShowFileManager:
         full_path = context.user_data["full_path"]
         encrypted_path = full_path + ".encrypted"
         
-        decrypt_file(encrypted_path, full_path, update.effective_user.id)
+        decrypt_file(encrypted_path, full_path, context.user_data["access_code"])
         
         with open(full_path, 'rb') as file:
             if cat == 'photos':
