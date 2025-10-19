@@ -86,7 +86,6 @@ class ShowFileManager:
         keyboard = []
         for file in files:
             file = file.rsplit(".encrypted", 1)[0]
-            print(file)
             keyboard.append([InlineKeyboardButton(file, callback_data=file)])
         keyboard.append([InlineKeyboardButton("К категориям", callback_data='back_to_cat')])
         reply_markup = InlineKeyboardMarkup(keyboard)
