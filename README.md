@@ -43,7 +43,8 @@
 ### Установка зависимостей
 
 ```bash
-pip install python-telegram-bot pycryptodome python-dotenv```
+pip install python-telegram-bot pycryptodome python-dotenv
+```
 
 Настройка окружения
 Создайте файл .env:
